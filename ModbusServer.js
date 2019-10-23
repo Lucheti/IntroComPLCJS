@@ -1,19 +1,24 @@
 // create an empty modbus client
 var ModbusRTU = require("modbus-serial");
+
+
+let values = Array(10);
+
 var vector = {
+
     getInputRegister: function(addr, unitID) {
+        console.log('getting input register')
         // Synchronous handling
         return addr;
     },
     getHoldingRegister: function(addr, unitID, callback) {
         // Asynchronous handling (with callback)
-        setTimeout(function() {
-            // callback = function(err, value)
-            callback(null, addr );
-        }, 10);
+        console.log("getting holding register")
+        callback(null,values[addr]);
     },
     getCoil: function(addr, unitID) {
         // Asynchronous handling (with Promises, async/await supported)
+        console.log("getting coil")
         return new Promise(function(resolve) {
             setTimeout(function() {
                 resolve((addr % 2) === 0);
@@ -21,7 +26,7 @@ var vector = {
         });
     },
     setRegister: function(addr, value, unitID) {
-        // Asynchronous handling supported also here
+        values[addr] = value;
         console.log("set register", addr, value, unitID);
         return;
     },
@@ -31,6 +36,7 @@ var vector = {
         return;
     },
     readDeviceIdentification: function(addr) {
+        console.log("reading device identification")
         return {
             0x00: "MyVendorName",
             0x01: "MyProductCode",
