@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 getRegisters = () => {
     fetch('http://localhost:3000/')
         .then(res => res.json())
-        .then(json => console.log(json))
+        .then(json=> console.log(json))
         .catch(err => console.log(err))
 }
 
@@ -43,13 +43,25 @@ getHistory = () => {
             'Content-Type': 'application/json',
         }
 
-    })
+    }).then(res => res.json())
+        .then(data => console.log(data))
 }
 
+fillList = () => {
+    fetch('http://localhost:3000/fill')
+}
+
+testList = () => {
+    fetch('http://localhost:3000/test')
+}
 // setRegister()
 
-// getRegisters()
+// getRegisters();
 
 // changeVariable()
 
-getHistory()
+// getHistory()
+
+// fillList()
+
+testList()
