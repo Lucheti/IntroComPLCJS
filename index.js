@@ -1,93 +1,131 @@
-const express = require('express');
-const Datastore = require('nedb');
-const ModbusRTU = require("modbus-serial");
+const express = require('express')
+const Datastore = require('nedb')
+const ModbusRTU = require('modbus-serial')
 
-const app = express();
+const app = express()
 
 // Parse URL-encoded bodies (as sent by HTML forms)
-app.use(express.urlencoded());
+app.use(express.urlencoded())
 
 // Parse JSON bodies (as sent by API clients)
-app.use(express.json());
+app.use(express.json())
 
-const database = new Datastore('database.db');
-database.loadDatabase();
+const database = new Datastore('database.db')
+database.loadDatabase()
 
-const client = new ModbusRTU();
-client.connectTCP("192.168.1.5", { port: 502 });
-client.setID(1);
+const client = new ModbusRTU()
+client.connectTCP('0.0.0.0', { port: 8502 })
+client.setID(1)
 
-let list = [];
-let newList = [];
+let list = []
+let newList = []
 
-app.get('/',(req, res) => {
-    client.readCoils(0x1,10).then( data => res.send(data))
-    // client.readHoldingRegisters(0,10).then(data => console.log(data))
-});
-
-app.post('/', (req,res) => {
-    console.log(req.ip)
-    database.insert(req.body)
-    client.writeRegisters(5,[2,1,5,7])
-    res.send({})
+app.get('/', (req, res) => {
+  console.log("getting")
+  let response = []
+  client.readHoldingRegisters(0,20).then(plcData => {
+    database.find({variable: true}, async ( _ , databaseData)=>{
+      await databaseData.forEach( variable => {
+        response = [...response,{name: variable.name, value: plcData.data[variable.value]}]
+      })
+        await res.json(response)
+    })
+  })
 })
 
-app.put('/' ,(req, res) => {
-    database.find({ name: "variables" }, (_ , data) => {
-            database.update(...data, {$set: {...req.body}})
-            database.insert({...req.body})
-        }
-    );
+app.post('/setVariable', (req, res) => {
+  if (getValueFromObject(req.body) > 20) {
+    res.status(400)
+    res.send({message: 'invalid index'})
+  }
+  database.insert({name: getKeyFromObject(req.body), value: getValueFromObject(req.body) , variable: true})
+  res.send({message: 'saved'})
+})
 
-    res.send({message: 'Setted'})
-    // database.find({name: "variables"} , (_,data) => console.log(data))
-});
+app.post('/changeValue', (req, res) => {
+  let index;
+  database.find({name: req.body.name}, (_ , data) => {
+    index = data[0].value
+    client.writeCoil(data[0].value, req.body.value)
+  } )
+
+  res.send(client.readHoldingRegisters(index,0))
+  // database.find({name: "variables"} , (_,data) => console.log(data))
+})
 
 app.post('/history', (req, res) => {
-    database.find({$and : [{[req.body.variable] : { $exists: true}} , {$not :{name: "variables"}} ]}, (_,data) => res.send(data))
+  database.find({ $and: [{ [req.body.variable]: { $exists: true } }, { $not: { name: 'variables' } }] }, (_, data) => res.send(data))
 
-});
-
-app.listen(3000,() => {
-    console.log('Example app listening on port 3000!');
-});
-
-app.get('/fill', (req,res) => {
-    for (let i = 0 ; i <= 100 ;i++) {
-        // client.readCoils(i,1).then(res => console.log(res))
-        client.readDiscreteInputs(i,1)
-          .then( resp => {
-              // list = [...list, {id: i, data: resp.data}];
-              // if (list.length === 43){
-              //   res.send({message: "ok"})
-              // }
-          })
-          .catch(err => console.log(err))
-    }
 })
 
-app.get('/test', (req,res) => {
-  newList = [];
-    for (let i = 0 ; i <= 100 ;i++) {
-        // client.readCoils(i,1).then(res => console.log(res))
-        client.readDiscreteInputs(i,1)
+app.listen(3002, () => {
+  console.log('Example app listening on port 3000!')
+})
+
+let previous = []
+
+app.get('/fill', (req, res) => {
+    let current = []
+    const start = 0
+    for (let i = start; i < start + 100; i++) {
+
+      try {
+        client.readCoils(i, 1)
           .then(resp => {
-              newList = [...newList, {id: i, data: resp.data}];
-              if (newList.length === 43){
-                  list.forEach( bool => {
-                      if(JSON.stringify(newList[list.indexOf(bool)]) !== JSON.stringify(bool)){
-                          console.log(`${i} is different`)
-                      }
-                  })
-                  list = newList;
-                  res.send({message: 'tested'})
-              }
-          })
-          .catch(err => console.log(err))
+            const newValue = { index: i, value: resp.data }
+            current = current.concat(resp.data)
+            console.log(resp)
+          }).catch(err => {
+            console.log(err)
+            console.log(i)
+        })
+      }catch (ignore) {
+
+      }
+      res.json()
     }
+
+    // setTimeout(() => {
+    //   console.log("after 2 secs...")
+    //   let changed = false
+    //   for (let i = 0; i < current.length; i++) {
+    //     if (JSON.stringify(current[i]) !== JSON.stringify(previous[i])){
+    //       console.log("FEDE DIJO CAMBIO: " + i)
+    //       changed = true
+    //     }
+    //     else {
+    //       console.log("FEDE DIJO NOOOO CAMBIO: " + i)
+    //     }
+    //   }
+    //   if (changed)console.log("FEDE DIJO ALGO CAMBIOOOOOOOOOOO")
+    //   previous = current
+    // }, 5000)
+
+
+    res.json('{"status":200}')
+  }
+)
+
+app.get('/test', (req, res) => {
+  newList = []
+  for (let i = 0; i <= 10000; i++) {
+    // client.readCoils(i,1).then(res => console.log(res))
+    client.readDiscreteInputs(i, 1)
+      .then(resp => {
+        newList = [...newList, { id: i, data: resp.data }]
+        if (newList.length === 43) {
+          list.forEach(bool => {
+            if (JSON.stringify(newList[list.indexOf(bool)]) !== JSON.stringify(bool)) {
+              console.log(`${i} is different`)
+            }
+          })
+          list = newList
+          res.send({ message: 'tested' })
+        }
+      })
+      .catch(err => console.log(err))
+  }
 })
 
-
-setTimeout( () => {
-
-} ,2000)
+const getValueFromObject = (o) => Object.values(o)[0]
+const getKeyFromObject = (o) => Object.keys(o)[0]

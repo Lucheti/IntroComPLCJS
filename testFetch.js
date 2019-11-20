@@ -10,9 +10,7 @@ getRegisters = () => {
 setRegister = () => {
     fetch('http://localhost:3000/', {
         method: 'POST',
-        body: JSON.stringify({
-            temperatura: 150
-        }),
+        body: JSON.stringify({ temperatura: 150 }),
         headers: {
             'Content-Type': 'application/json',
         }
