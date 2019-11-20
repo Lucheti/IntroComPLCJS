@@ -1,6 +1,7 @@
 const express = require('express')
 const Datastore = require('nedb')
 const ModbusRTU = require('modbus-serial')
+const cors = require('cors')
 
 const app = express()
 
@@ -9,6 +10,9 @@ app.use(express.urlencoded())
 
 // Parse JSON bodies (as sent by API clients)
 app.use(express.json())
+
+app.use(cors())
+
 
 const database = new Datastore('database.db')
 database.loadDatabase()
@@ -23,12 +27,12 @@ let newList = []
 app.get('/', (req, res) => {
   console.log("getting")
   let response = []
-  client.readHoldingRegisters(0,20).then(plcData => {
-    database.find({variable: true}, async ( _ , databaseData)=>{
-      await databaseData.forEach( variable => {
+  client.readHoldingRegisters(0,20).then( async plcData => {
+    database.find({variable: true},  ( _ , databaseData) => {
+       databaseData.forEach( variable => {
         response = [...response,{name: variable.name, value: plcData.data[variable.value]}]
       })
-        await res.json(response)
+      res.json(response)
     })
   })
 })
@@ -38,11 +42,14 @@ app.post('/setVariable', (req, res) => {
     res.status(400)
     res.send({message: 'invalid index'})
   }
-  database.insert({name: getKeyFromObject(req.body), value: getValueFromObject(req.body) , variable: true})
+  database.count({variable: true}, (_,count) => {
+    database.insert({name: req.body.name, value: count + 1 , variable: true})
+  })
   res.send({message: 'saved'})
 })
 
 app.post('/changeValue', (req, res) => {
+  console.log('changing', req.body)
   let index;
   database.find({name: req.body.name}, (_ , data) => {
     index = data[0].value
