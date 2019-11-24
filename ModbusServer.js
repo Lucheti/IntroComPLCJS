@@ -28,7 +28,6 @@ var vector = {
         return 1;
     },
     setCoil: function(addr, value, unitID) {
-        console.log("coil",addr,value)
         values[addr] = value;
         return;
     },
